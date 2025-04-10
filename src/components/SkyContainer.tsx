@@ -6,14 +6,9 @@ import Bird from "./Bird";
 import { Button } from "@/components/ui/button";
 import { Cloud as CloudIcon, Bird as BirdIcon } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
-
-interface SkyElement {
-  id: string;
-  type: "cloud" | "bird";
-  position: { x: number; y: number };
-  size: number;
-  animationDelay: string;
-}
+import { SkyService } from "@/services/sky.service";
+import { SkyElement } from "@/services/api.types";
+import { apiConfig } from "@/config/api.config";
 
 const SkyContainer: React.FC = () => {
   const [elements, setElements] = useState<SkyElement[]>([]);
@@ -21,27 +16,40 @@ const SkyContainer: React.FC = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load existing elements from localStorage
+    // Load existing elements from APIs
     const loadSkyElements = async () => {
       setIsLoading(true);
       try {
-        // Simulate API fetch delay
-        await new Promise((resolve) => setTimeout(resolve, 500));
+        const loadedElements = await SkyService.loadAllElements();
         
-        // Get data from localStorage
-        const savedElements = localStorage.getItem("skyElements");
-        if (savedElements) {
-          setElements(JSON.parse(savedElements));
+        // If we got elements from the API, update the state
+        if (loadedElements.length > 0) {
+          setElements(loadedElements);
           toast({
             title: "Sky loaded",
             description: "Your saved sky has been loaded successfully!",
           });
+        } else {
+          // If APIs returned nothing, check localStorage as fallback
+          const savedElements = localStorage.getItem("skyElements");
+          if (savedElements) {
+            const parsedElements = JSON.parse(savedElements);
+            setElements(parsedElements);
+            
+            // Save these elements to the APIs
+            await SkyService.saveAllElements(parsedElements);
+            
+            toast({
+              title: "Sky loaded from local storage",
+              description: "Your saved sky has been loaded from local storage and synced to the API.",
+            });
+          }
         }
       } catch (error) {
         console.error("Error loading sky elements:", error);
         toast({
           title: "Error loading sky",
-          description: "There was a problem loading your saved sky.",
+          description: `There was a problem loading your saved sky from API: ${apiConfig.birds.baseUrl} and ${apiConfig.clouds.baseUrl}`,
           variant: "destructive",
         });
       } finally {
@@ -53,14 +61,21 @@ const SkyContainer: React.FC = () => {
   }, [toast]);
 
   useEffect(() => {
-    // Save to localStorage whenever elements change
+    // Save to APIs whenever elements change
     const saveSkyElements = async () => {
-      try {
-        // Simulate API call delay
-        await new Promise((resolve) => setTimeout(resolve, 300));
-        localStorage.setItem("skyElements", JSON.stringify(elements));
-      } catch (error) {
-        console.error("Error saving sky elements:", error);
+      if (elements.length > 0) {
+        try {
+          const saved = await SkyService.saveAllElements(elements);
+          if (!saved) {
+            // If API save fails, save to localStorage as backup
+            localStorage.setItem("skyElements", JSON.stringify(elements));
+            console.warn("Saved to localStorage as API save failed");
+          }
+        } catch (error) {
+          console.error("Error saving sky elements:", error);
+          // Save to localStorage as backup
+          localStorage.setItem("skyElements", JSON.stringify(elements));
+        }
       }
     };
 
@@ -69,7 +84,7 @@ const SkyContainer: React.FC = () => {
     }
   }, [elements]);
 
-  const addElement = (type: "cloud" | "bird") => {
+  const addElement = async (type: "cloud" | "bird") => {
     // Generate random position within the container
     const position = {
       x: Math.floor(Math.random() * 80) + 5, // 5% to 85%
@@ -90,30 +105,49 @@ const SkyContainer: React.FC = () => {
       animationDelay,
     };
 
+    // Add to local state immediately for UI responsiveness
     setElements((prev) => [...prev, newElement]);
     
-    toast({
-      title: `Added ${type}`,
-      description: `A new ${type} has been added to your sky!`,
-    });
+    // Try to add to the API
+    const added = await SkyService.addElement(newElement);
+    
+    if (added) {
+      toast({
+        title: `Added ${type}`,
+        description: `A new ${type} has been added to your sky and saved to the API!`,
+      });
+    } else {
+      toast({
+        title: `Added ${type} (locally only)`,
+        description: `A new ${type} has been added to your sky but failed to save to the API.`,
+      });
+    }
   };
 
   const clearSky = async () => {
     setIsLoading(true);
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      const cleared = await SkyService.clearAllElements();
+      
+      if (cleared) {
+        // If API clear succeeded, also clear local state and localStorage
+        localStorage.removeItem("skyElements");
+        setElements([]);
+        toast({
+          title: "Sky cleared",
+          description: "All elements have been removed from your sky and the API.",
+        });
+      } else {
+        throw new Error("Failed to clear elements from API");
+      }
+    } catch (error) {
+      console.error("Error clearing sky:", error);
+      // Clear local state and localStorage anyway
       localStorage.removeItem("skyElements");
       setElements([]);
       toast({
-        title: "Sky cleared",
-        description: "All elements have been removed from your sky.",
-      });
-    } catch (error) {
-      console.error("Error clearing sky:", error);
-      toast({
-        title: "Error clearing sky",
-        description: "There was a problem clearing your sky.",
+        title: "Sky cleared (locally only)",
+        description: "All elements have been removed from your sky locally, but there was an error clearing the API data.",
         variant: "destructive",
       });
     } finally {
