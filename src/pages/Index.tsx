@@ -25,6 +25,16 @@ const Index = () => {
               <li>Counters below each button show the number of elements in local storage and API</li>
               <li>Your sky is automatically saved locally and to the connected API</li>
             </ul>
+            
+            <div className="mt-4 p-4 bg-yellow-50 rounded border border-yellow-200">
+              <h3 className="text-lg font-medium mb-2">API Configuration</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                This application is designed to work with or without API connectivity. If the API is not available, elements will be stored in your browser's local storage.
+              </p>
+              <p className="text-sm text-gray-600">
+                To configure your own API endpoints, update the URLs in <code className="bg-gray-100 px-1 py-0.5 rounded">src/config/api.config.ts</code>.
+              </p>
+            </div>
           </div>
         </div>
       </main>

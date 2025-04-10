@@ -23,35 +23,7 @@ const SkyContainer: React.FC = () => {
     const loadSkyElements = async () => {
       setIsLoading(true);
       try {
-        const loadedElements = await SkyService.loadAllElements();
-        
-        if (loadedElements.length > 0) {
-          setElements(loadedElements);
-          updateApiCounts(loadedElements);
-          toast({
-            title: "Sky loaded",
-            description: "Your saved sky has been loaded successfully!",
-          });
-        } else {
-          const savedElements = localStorage.getItem("skyElements");
-          if (savedElements) {
-            const parsedElements = JSON.parse(savedElements);
-            setElements(parsedElements);
-            updateLocalCounts(parsedElements);
-            
-            await SkyService.saveAllElements(parsedElements);
-            updateApiCounts(parsedElements);
-            
-            toast({
-              title: "Sky loaded from local storage",
-              description: "Your saved sky has been loaded from local storage and synced to the API.",
-            });
-          }
-        }
-      } catch (error) {
-        console.error("Error loading sky elements:", error);
-        
-        // Try to load from localStorage as fallback
+        // First check if we have elements in localStorage
         const savedElements = localStorage.getItem("skyElements");
         if (savedElements) {
           const parsedElements = JSON.parse(savedElements);
@@ -60,15 +32,61 @@ const SkyContainer: React.FC = () => {
           
           toast({
             title: "Sky loaded from local storage",
-            description: "There was a problem loading from the API, so we loaded from local storage.",
+            description: "Your saved sky has been loaded from local storage.",
           });
+          
+          // Try to load from API in the background
+          try {
+            const apiElements = await SkyService.loadAllElements();
+            if (apiElements.length > 0) {
+              updateApiCounts(apiElements);
+              toast({
+                title: "API sync complete",
+                description: "Your sky has been synchronized with the API.",
+              });
+            }
+          } catch (apiError) {
+            console.error("Error syncing with API:", apiError);
+            toast({
+              variant: "destructive",
+              title: "API sync failed",
+              description: "Could not connect to the API. Working in offline mode.",
+            });
+          }
         } else {
-          toast({
-            title: "Error loading sky",
-            description: `There was a problem loading your saved sky from API: ${apiConfig.birds.baseUrl} and ${apiConfig.clouds.baseUrl}`,
-            variant: "destructive",
-          });
+          // No local storage, try the API
+          try {
+            const loadedElements = await SkyService.loadAllElements();
+            
+            if (loadedElements.length > 0) {
+              setElements(loadedElements);
+              updateApiCounts(loadedElements);
+              // Save to localStorage for offline use
+              localStorage.setItem("skyElements", JSON.stringify(loadedElements));
+              updateLocalCounts(loadedElements);
+              
+              toast({
+                title: "Sky loaded from API",
+                description: "Your saved sky has been loaded successfully!",
+              });
+            }
+          } catch (apiError) {
+            console.error("Error loading from API:", apiError);
+            toast({
+              variant: "destructive",
+              title: "Cannot load from API",
+              description: "Starting with an empty sky. Check your API configuration.",
+            });
+          }
         }
+      } catch (error) {
+        console.error("Error loading sky elements:", error);
+        
+        toast({
+          variant: "destructive",
+          title: "Error loading sky",
+          description: "There was a problem loading your saved sky.",
+        });
       } finally {
         setIsLoading(false);
       }
@@ -138,17 +156,25 @@ const SkyContainer: React.FC = () => {
     updateLocalCounts(updatedElements);
     
     // Try to save to API
-    const added = await SkyService.addElement(newElement);
-    
-    if (added) {
-      // Update API counts if successful
-      updateApiCounts(updatedElements);
+    try {
+      const added = await SkyService.addElement(newElement);
       
-      toast({
-        title: `Added ${type}`,
-        description: `A new ${type} has been added to your sky and saved to the API!`,
-      });
-    } else {
+      if (added) {
+        // Update API counts if successful
+        updateApiCounts(updatedElements);
+        
+        toast({
+          title: `Added ${type}`,
+          description: `A new ${type} has been added to your sky and saved to the API!`,
+        });
+      } else {
+        toast({
+          title: `Added ${type} (locally only)`,
+          description: `A new ${type} has been added to your sky but failed to save to the API.`,
+        });
+      }
+    } catch (error) {
+      console.error("API save error:", error);
       toast({
         title: `Added ${type} (locally only)`,
         description: `A new ${type} has been added to your sky but failed to save to the API.`,
@@ -158,32 +184,33 @@ const SkyContainer: React.FC = () => {
 
   const clearSky = async () => {
     setIsLoading(true);
+    
+    // Clear local state first
+    localStorage.removeItem("skyElements");
+    setElements([]);
+    setLocalCounts({ birds: 0, clouds: 0 });
+    
+    // Try to clear API
     try {
       const cleared = await SkyService.clearAllElements();
       
       if (cleared) {
-        localStorage.removeItem("skyElements");
-        setElements([]);
         setApiCounts({ birds: 0, clouds: 0 });
-        setLocalCounts({ birds: 0, clouds: 0 });
-        
         toast({
           title: "Sky cleared",
           description: "All elements have been removed from your sky and the API.",
         });
       } else {
-        throw new Error("Failed to clear elements from API");
+        toast({
+          title: "Sky cleared (locally only)",
+          description: "All elements have been removed locally, but there was an error clearing the API data.",
+        });
       }
     } catch (error) {
-      console.error("Error clearing sky:", error);
-      localStorage.removeItem("skyElements");
-      setElements([]);
-      setLocalCounts({ birds: 0, clouds: 0 });
-      
+      console.error("Error clearing sky from API:", error);
       toast({
         title: "Sky cleared (locally only)",
-        description: "All elements have been removed from your sky locally, but there was an error clearing the API data.",
-        variant: "destructive",
+        description: "All elements have been removed locally, but there was an error clearing the API data.",
       });
     } finally {
       setIsLoading(false);

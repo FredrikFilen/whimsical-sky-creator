@@ -3,12 +3,12 @@
  * API Configuration
  * 
  * This file contains the configuration for the Bird and Cloud APIs.
- * Update these endpoints to point to your actual API servers.
+ * Using relative URLs to avoid CORS issues.
  */
 
 export const apiConfig = {
   birds: {
-    baseUrl: "https://api.example.com/birds", // Replace with your actual Bird API endpoint
+    baseUrl: "/api/birds", // Using relative URL to avoid CORS issues
     headers: {
       "Content-Type": "application/json",
       // Add any API keys or authentication headers here
@@ -16,7 +16,7 @@ export const apiConfig = {
     }
   },
   clouds: {
-    baseUrl: "https://api.example.com/clouds", // Replace with your actual Cloud API endpoint
+    baseUrl: "/api/clouds", // Using relative URL to avoid CORS issues
     headers: {
       "Content-Type": "application/json",
       // Add any API keys or authentication headers here
