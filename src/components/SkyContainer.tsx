@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import Cloud from "./Cloud";
@@ -7,8 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Cloud as CloudIcon, Bird as BirdIcon } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 import { SkyService } from "@/services/sky.service";
-import { SkyElement } from "@/services/api.types";
+import { SkyElement, Bird as BirdType, Cloud as CloudType } from "@/services/api.types";
 import { apiConfig } from "@/config/api.config";
+import { getRandomBirdColor, getRandomCloudSize } from "@/utils/colorUtils";
 
 const SkyContainer: React.FC = () => {
   const [elements, setElements] = useState<SkyElement[]>([]);
@@ -16,13 +16,11 @@ const SkyContainer: React.FC = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Load existing elements from APIs
     const loadSkyElements = async () => {
       setIsLoading(true);
       try {
         const loadedElements = await SkyService.loadAllElements();
         
-        // If we got elements from the API, update the state
         if (loadedElements.length > 0) {
           setElements(loadedElements);
           toast({
@@ -30,13 +28,11 @@ const SkyContainer: React.FC = () => {
             description: "Your saved sky has been loaded successfully!",
           });
         } else {
-          // If APIs returned nothing, check localStorage as fallback
           const savedElements = localStorage.getItem("skyElements");
           if (savedElements) {
             const parsedElements = JSON.parse(savedElements);
             setElements(parsedElements);
             
-            // Save these elements to the APIs
             await SkyService.saveAllElements(parsedElements);
             
             toast({
@@ -61,19 +57,16 @@ const SkyContainer: React.FC = () => {
   }, [toast]);
 
   useEffect(() => {
-    // Save to APIs whenever elements change
     const saveSkyElements = async () => {
       if (elements.length > 0) {
         try {
           const saved = await SkyService.saveAllElements(elements);
           if (!saved) {
-            // If API save fails, save to localStorage as backup
             localStorage.setItem("skyElements", JSON.stringify(elements));
             console.warn("Saved to localStorage as API save failed");
           }
         } catch (error) {
           console.error("Error saving sky elements:", error);
-          // Save to localStorage as backup
           localStorage.setItem("skyElements", JSON.stringify(elements));
         }
       }
@@ -85,30 +78,38 @@ const SkyContainer: React.FC = () => {
   }, [elements]);
 
   const addElement = async (type: "cloud" | "bird") => {
-    // Generate random position within the container
     const position = {
-      x: Math.floor(Math.random() * 80) + 5, // 5% to 85%
-      y: Math.floor(Math.random() * 70) + 5, // 5% to 75%
+      x: Math.floor(Math.random() * 80) + 5,
+      y: Math.floor(Math.random() * 70) + 5,
     };
 
-    // Random size between 1 and 2
     const size = Math.random() * 1 + 1;
-    
-    // Random animation delay
     const animationDelay = `${Math.random() * 10}s`;
 
-    const newElement: SkyElement = {
-      id: uuidv4(),
-      type,
-      position,
-      size,
-      animationDelay,
-    };
+    let newElement: SkyElement;
 
-    // Add to local state immediately for UI responsiveness
+    if (type === "bird") {
+      newElement = {
+        id: uuidv4(),
+        type,
+        position,
+        size,
+        animationDelay,
+        color: getRandomBirdColor(),
+      } as BirdType;
+    } else {
+      newElement = {
+        id: uuidv4(),
+        type,
+        position,
+        size,
+        animationDelay,
+        cloudSize: getRandomCloudSize(),
+      } as CloudType;
+    }
+
     setElements((prev) => [...prev, newElement]);
     
-    // Try to add to the API
     const added = await SkyService.addElement(newElement);
     
     if (added) {
@@ -130,7 +131,6 @@ const SkyContainer: React.FC = () => {
       const cleared = await SkyService.clearAllElements();
       
       if (cleared) {
-        // If API clear succeeded, also clear local state and localStorage
         localStorage.removeItem("skyElements");
         setElements([]);
         toast({
@@ -142,7 +142,6 @@ const SkyContainer: React.FC = () => {
       }
     } catch (error) {
       console.error("Error clearing sky:", error);
-      // Clear local state and localStorage anyway
       localStorage.removeItem("skyElements");
       setElements([]);
       toast({
@@ -163,7 +162,6 @@ const SkyContainer: React.FC = () => {
           background: "linear-gradient(to bottom, #87CEEB, #1E90FF)",
         }}
       >
-        {/* Render clouds and birds */}
         {elements.map((element) => (
           element.type === "cloud" ? (
             <Cloud
@@ -172,6 +170,7 @@ const SkyContainer: React.FC = () => {
               position={element.position}
               size={element.size}
               animationDelay={element.animationDelay}
+              cloudSize={(element as CloudType).cloudSize || "medium"}
             />
           ) : (
             <Bird
@@ -180,6 +179,7 @@ const SkyContainer: React.FC = () => {
               position={element.position}
               size={element.size}
               animationDelay={element.animationDelay}
+              color={(element as BirdType).color || "#000000"}
             />
           )
         ))}

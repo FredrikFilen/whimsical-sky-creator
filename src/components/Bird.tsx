@@ -7,9 +7,10 @@ interface BirdProps {
   position: { x: number; y: number };
   size: number;
   animationDelay: string;
+  color: string;
 }
 
-const Bird: React.FC<BirdProps> = ({ id, position, size, animationDelay }) => {
+const Bird: React.FC<BirdProps> = ({ id, position, size, animationDelay, color }) => {
   return (
     <div
       className="absolute fly-animation"
@@ -28,7 +29,7 @@ const Bird: React.FC<BirdProps> = ({ id, position, size, animationDelay }) => {
           fontSize: `${size * 24}px`
         }}
       >
-        {/* Simple bird icon using characters */}
+        {/* Simple bird icon using SVG */}
         <div className="relative">
           <svg
             width={size * 30}
@@ -39,7 +40,7 @@ const Bird: React.FC<BirdProps> = ({ id, position, size, animationDelay }) => {
           >
             <path
               d="M2,14 Q10,8 15,14 Q20,8 28,14 L26,11 L28,14 L26,17 M15,14 L13,18"
-              stroke="black"
+              stroke={color}
               strokeWidth="2"
               fill="none"
             />

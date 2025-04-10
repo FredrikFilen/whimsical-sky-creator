@@ -7,9 +7,16 @@ interface CloudProps {
   position: { x: number; y: number };
   size: number;
   animationDelay: string;
+  cloudSize: "small" | "medium" | "large";
 }
 
-const Cloud: React.FC<CloudProps> = ({ id, position, size, animationDelay }) => {
+const Cloud: React.FC<CloudProps> = ({ id, position, size, animationDelay, cloudSize }) => {
+  // Scale based on cloud size category
+  const sizeMultiplier = 
+    cloudSize === "small" ? 0.7 :
+    cloudSize === "large" ? 1.3 : 
+    1; // medium is the default
+    
   return (
     <div
       className={cn("absolute float-animation")}
@@ -27,8 +34,8 @@ const Cloud: React.FC<CloudProps> = ({ id, position, size, animationDelay }) => 
             "opacity-90"
           )}
           style={{
-            width: `${size * 40}px`,
-            height: `${size * 40}px`,
+            width: `${size * 40 * sizeMultiplier}px`,
+            height: `${size * 40 * sizeMultiplier}px`,
           }}
         ></div>
         <div
@@ -37,10 +44,10 @@ const Cloud: React.FC<CloudProps> = ({ id, position, size, animationDelay }) => 
             "opacity-90"
           )}
           style={{
-            width: `${size * 60}px`,
-            height: `${size * 60}px`,
-            left: `${size * 20}px`,
-            top: `${-size * 10}px`,
+            width: `${size * 60 * sizeMultiplier}px`,
+            height: `${size * 60 * sizeMultiplier}px`,
+            left: `${size * 20 * sizeMultiplier}px`,
+            top: `${-size * 10 * sizeMultiplier}px`,
           }}
         ></div>
         <div
@@ -49,10 +56,10 @@ const Cloud: React.FC<CloudProps> = ({ id, position, size, animationDelay }) => 
             "opacity-90"
           )}
           style={{
-            width: `${size * 50}px`,
-            height: `${size * 50}px`,
-            left: `${size * 50}px`,
-            top: `${size * 0}px`,
+            width: `${size * 50 * sizeMultiplier}px`,
+            height: `${size * 50 * sizeMultiplier}px`,
+            left: `${size * 50 * sizeMultiplier}px`,
+            top: `${size * 0 * sizeMultiplier}px`,
           }}
         ></div>
       </div>
