@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import Cloud from "./Cloud";
@@ -9,10 +10,13 @@ import { SkyService } from "@/services/sky.service";
 import { SkyElement, Bird as BirdType, Cloud as CloudType } from "@/services/api.types";
 import { apiConfig } from "@/config/api.config";
 import { getRandomBirdColor, getRandomCloudSize } from "@/utils/colorUtils";
+import { Badge } from "@/components/ui/badge";
 
 const SkyContainer: React.FC = () => {
   const [elements, setElements] = useState<SkyElement[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [apiCounts, setApiCounts] = useState({ birds: 0, clouds: 0 });
+  const [localCounts, setLocalCounts] = useState({ birds: 0, clouds: 0 });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -23,6 +27,7 @@ const SkyContainer: React.FC = () => {
         
         if (loadedElements.length > 0) {
           setElements(loadedElements);
+          updateApiCounts(loadedElements);
           toast({
             title: "Sky loaded",
             description: "Your saved sky has been loaded successfully!",
@@ -32,8 +37,10 @@ const SkyContainer: React.FC = () => {
           if (savedElements) {
             const parsedElements = JSON.parse(savedElements);
             setElements(parsedElements);
+            updateLocalCounts(parsedElements);
             
             await SkyService.saveAllElements(parsedElements);
+            updateApiCounts(parsedElements);
             
             toast({
               title: "Sky loaded from local storage",
@@ -43,11 +50,25 @@ const SkyContainer: React.FC = () => {
         }
       } catch (error) {
         console.error("Error loading sky elements:", error);
-        toast({
-          title: "Error loading sky",
-          description: `There was a problem loading your saved sky from API: ${apiConfig.birds.baseUrl} and ${apiConfig.clouds.baseUrl}`,
-          variant: "destructive",
-        });
+        
+        // Try to load from localStorage as fallback
+        const savedElements = localStorage.getItem("skyElements");
+        if (savedElements) {
+          const parsedElements = JSON.parse(savedElements);
+          setElements(parsedElements);
+          updateLocalCounts(parsedElements);
+          
+          toast({
+            title: "Sky loaded from local storage",
+            description: "There was a problem loading from the API, so we loaded from local storage.",
+          });
+        } else {
+          toast({
+            title: "Error loading sky",
+            description: `There was a problem loading your saved sky from API: ${apiConfig.birds.baseUrl} and ${apiConfig.clouds.baseUrl}`,
+            variant: "destructive",
+          });
+        }
       } finally {
         setIsLoading(false);
       }
@@ -56,26 +77,29 @@ const SkyContainer: React.FC = () => {
     loadSkyElements();
   }, [toast]);
 
+  // Update counts whenever elements change
   useEffect(() => {
-    const saveSkyElements = async () => {
-      if (elements.length > 0) {
-        try {
-          const saved = await SkyService.saveAllElements(elements);
-          if (!saved) {
-            localStorage.setItem("skyElements", JSON.stringify(elements));
-            console.warn("Saved to localStorage as API save failed");
-          }
-        } catch (error) {
-          console.error("Error saving sky elements:", error);
-          localStorage.setItem("skyElements", JSON.stringify(elements));
-        }
-      }
-    };
-
     if (elements.length > 0) {
-      saveSkyElements();
+      // Update local counts
+      updateLocalCounts(elements);
+      
+      // Save to localStorage
+      localStorage.setItem("skyElements", JSON.stringify(elements));
     }
   }, [elements]);
+
+  // Update API and local counts
+  const updateApiCounts = (elements: SkyElement[]) => {
+    const birds = elements.filter(element => element.type === "bird").length;
+    const clouds = elements.filter(element => element.type === "cloud").length;
+    setApiCounts({ birds, clouds });
+  };
+
+  const updateLocalCounts = (elements: SkyElement[]) => {
+    const birds = elements.filter(element => element.type === "bird").length;
+    const clouds = elements.filter(element => element.type === "cloud").length;
+    setLocalCounts({ birds, clouds });
+  };
 
   const addElement = async (type: "cloud" | "bird") => {
     const position = {
@@ -108,11 +132,18 @@ const SkyContainer: React.FC = () => {
       } as CloudType;
     }
 
-    setElements((prev) => [...prev, newElement]);
+    // Update local state immediately
+    const updatedElements = [...elements, newElement];
+    setElements(updatedElements);
+    updateLocalCounts(updatedElements);
     
+    // Try to save to API
     const added = await SkyService.addElement(newElement);
     
     if (added) {
+      // Update API counts if successful
+      updateApiCounts(updatedElements);
+      
       toast({
         title: `Added ${type}`,
         description: `A new ${type} has been added to your sky and saved to the API!`,
@@ -133,6 +164,9 @@ const SkyContainer: React.FC = () => {
       if (cleared) {
         localStorage.removeItem("skyElements");
         setElements([]);
+        setApiCounts({ birds: 0, clouds: 0 });
+        setLocalCounts({ birds: 0, clouds: 0 });
+        
         toast({
           title: "Sky cleared",
           description: "All elements have been removed from your sky and the API.",
@@ -144,6 +178,8 @@ const SkyContainer: React.FC = () => {
       console.error("Error clearing sky:", error);
       localStorage.removeItem("skyElements");
       setElements([]);
+      setLocalCounts({ birds: 0, clouds: 0 });
+      
       toast({
         title: "Sky cleared (locally only)",
         description: "All elements have been removed from your sky locally, but there was an error clearing the API data.",
@@ -185,25 +221,45 @@ const SkyContainer: React.FC = () => {
         ))}
       </div>
 
-      <div className="flex gap-4 mt-4">
-        <Button 
-          onClick={() => addElement("cloud")}
-          disabled={isLoading}
-          className="flex items-center gap-2"
-        >
-          <CloudIcon size={18} />
-          Add Cloud
-        </Button>
+      <div className="flex flex-wrap gap-4 mt-4 justify-center">
+        <div className="flex flex-col items-center">
+          <Button 
+            onClick={() => addElement("cloud")}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+          >
+            <CloudIcon size={18} />
+            Add Cloud
+          </Button>
+          <div className="flex gap-2 mt-2 text-sm">
+            <Badge variant="outline" className="flex gap-1">
+              Local: {localCounts.clouds}
+            </Badge>
+            <Badge variant="secondary" className="flex gap-1">
+              API: {apiCounts.clouds}
+            </Badge>
+          </div>
+        </div>
         
-        <Button 
-          onClick={() => addElement("bird")}
-          disabled={isLoading}
-          className="flex items-center gap-2"
-          variant="secondary"
-        >
-          <BirdIcon size={18} />
-          Add Bird
-        </Button>
+        <div className="flex flex-col items-center">
+          <Button 
+            onClick={() => addElement("bird")}
+            disabled={isLoading}
+            className="flex items-center gap-2"
+            variant="secondary"
+          >
+            <BirdIcon size={18} />
+            Add Bird
+          </Button>
+          <div className="flex gap-2 mt-2 text-sm">
+            <Badge variant="outline" className="flex gap-1">
+              Local: {localCounts.birds}
+            </Badge>
+            <Badge variant="secondary" className="flex gap-1">
+              API: {apiCounts.birds}
+            </Badge>
+          </div>
+        </div>
 
         <Button 
           onClick={clearSky}

@@ -22,7 +22,8 @@ const Index = () => {
               <li>Click the "Add Cloud" button to add a floating cloud to your sky</li>
               <li>Click the "Add Bird" button to add a flying bird to your sky</li>
               <li>Each element will float around with its own unique animation</li>
-              <li>Your sky is automatically saved locally</li>
+              <li>Counters below each button show the number of elements in local storage and API</li>
+              <li>Your sky is automatically saved locally and to the connected API</li>
             </ul>
           </div>
         </div>
